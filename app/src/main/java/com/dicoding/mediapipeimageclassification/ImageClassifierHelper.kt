@@ -29,11 +29,18 @@ class ImageClassifierHelper(
     }
 
     fun clearImageClassifier() {
+        // Classifier must be closed when creating a new one to avoid returning results to a
+        // non-existent object
+        imageClassifier?.close()
         //use if you change the threshold, maxResult, threads, or delegates.
         imageClassifier = null
     }
 
-    private fun setupImageClassifier() {
+    fun isClosed(): Boolean {
+        return imageClassifier == null
+    }
+
+    fun setupImageClassifier() {
 
         val baseOptionsBuilder = BaseOptions.builder()
         baseOptionsBuilder.setDelegate(Delegate.CPU)
@@ -97,10 +104,6 @@ class ImageClassifierHelper(
     }
 
     companion object {
-        const val DELEGATE_CPU = 0
-        const val DELEGATE_GPU = 1
-        const val DELEGATE_NNAPI = 2
-
         private const val TAG = "ImageClassifierHelper"
     }
 }

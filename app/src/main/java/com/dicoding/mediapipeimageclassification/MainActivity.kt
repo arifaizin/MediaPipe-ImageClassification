@@ -17,6 +17,7 @@ import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
 
+    private lateinit var imageClassifierHelper: ImageClassifierHelper
     private lateinit var binding: ActivityMainBinding
 
     private val requestPermissionLauncher =
@@ -40,7 +41,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun startCamera() {
 
-        val imageClassifierHelper =
+        imageClassifierHelper =
             ImageClassifierHelper(
                 context = this,
                 imageClassifierListener = object : ImageClassifierHelper.ClassifierListener {
@@ -110,5 +111,17 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "Gagal memunculkan kamera.", Toast.LENGTH_SHORT).show()
             }
         }, ContextCompat.getMainExecutor(this))
+    }
+
+    override fun onPause() {
+        super.onPause()
+        imageClassifierHelper.clearImageClassifier()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (imageClassifierHelper.isClosed()) {
+            imageClassifierHelper.setupImageClassifier()
+        }
     }
 }
