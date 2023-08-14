@@ -7,10 +7,13 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.camera.core.AspectRatio
 import androidx.camera.core.CameraSelector
+import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.Preview
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.core.content.ContextCompat
 import com.dicoding.mediapipeimageclassification.databinding.ActivityMainBinding
+import com.google.mediapipe.tasks.vision.imageclassifier.ImageClassifierResult
+import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
 
@@ -20,7 +23,8 @@ class MainActivity : AppCompatActivity() {
         registerForActivityResult(
             ActivityResultContracts.RequestPermission()
         ) { isGranted: Boolean ->
-            val message = if (isGranted) "Camera permission granted" else "Camera permission rejected"
+            val message =
+                if (isGranted) "Camera permission granted" else "Camera permission rejected"
             Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
         }
 
@@ -36,6 +40,36 @@ class MainActivity : AppCompatActivity() {
 
     private fun startCamera() {
 
+        val imageClassifierHelper =
+            ImageClassifierHelper(
+                context = this,
+                imageClassifierListener = object : ImageClassifierHelper.ClassifierListener {
+                    override fun onError(error: String) {
+                        runOnUiThread {
+                            Toast.makeText(this@MainActivity, error, Toast.LENGTH_SHORT).show()
+                        }
+                    }
+
+                    override fun onResults(results: ImageClassifierResult?, inferenceTime: Long) {
+                        runOnUiThread {
+                            results?.classificationResult()?.classifications()?.let { it ->
+                                println(it)
+
+                                if (it.isNotEmpty() && it[0].categories().isNotEmpty()) {
+                                    println(it)
+                                    val sortedCategories =
+                                        it[0].categories().sortedByDescending { it?.score() }
+                                    val displayResult =
+                                        sortedCategories.joinToString("\n") {
+                                            "${it.categoryName()} " + String.format("%.2f", it.score()).trim()
+                                        }
+                                    binding.tvResult.text = displayResult
+                                }
+                            }
+                        }
+                    }
+                })
+
         val cameraProviderFuture = ProcessCameraProvider.getInstance(this)
 
         cameraProviderFuture.addListener({
@@ -47,12 +81,30 @@ class MainActivity : AppCompatActivity() {
                     it.setSurfaceProvider(binding.viewFinder.surfaceProvider)
                 }
 
+            val imageAnalyzer =
+                ImageAnalysis.Builder()
+                    .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+                    .setTargetRotation(binding.viewFinder.display.rotation)
+                    .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
+                    .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
+                    .build()
+                    // The analyzer can then be assigned to the instance
+                    .also {
+                        it.setAnalyzer(Executors.newSingleThreadExecutor()) { image ->
+
+
+                            // Pass Bitmap and rotation to the image classifier helper for processing and classification
+                            imageClassifierHelper.classify(image)
+                        }
+                    }
+
             try {
                 cameraProvider.unbindAll()
                 cameraProvider.bindToLifecycle(
                     this,
                     CameraSelector.DEFAULT_BACK_CAMERA,
-                    preview
+                    preview,
+                    imageAnalyzer
                 )
             } catch (exc: Exception) {
                 Toast.makeText(this, "Gagal memunculkan kamera.", Toast.LENGTH_SHORT).show()
