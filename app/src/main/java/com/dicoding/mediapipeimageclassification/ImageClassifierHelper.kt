@@ -43,8 +43,8 @@ class ImageClassifierHelper(
     fun setupImageClassifier() {
 
         val baseOptionsBuilder = BaseOptions.builder()
-        baseOptionsBuilder.setDelegate(currentDelegate)
-        baseOptionsBuilder.setModelAssetPath(modelName)
+            .setDelegate(currentDelegate)
+            .setModelAssetPath(modelName)
 
         val optionsBuilder = ImageClassifier.ImageClassifierOptions.builder()
             .setScoreThreshold(threshold)
