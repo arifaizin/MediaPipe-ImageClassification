@@ -19,6 +19,7 @@ class ImageClassifierHelper(
     var numThreads: Int = 4,
     var currentDelegate: Int = 2,
     val modelName: String = "mobilenet_v1_1.0_224_quantized_1_metadata_1.tflite",
+    var runningMode: RunningMode = RunningMode.IMAGE,
     val context: Context,
     val imageClassifierListener: ClassifierListener?
 ) {
@@ -49,16 +50,21 @@ class ImageClassifierHelper(
         val optionsBuilder = ImageClassifier.ImageClassifierOptions.builder()
             .setScoreThreshold(threshold)
             .setMaxResults(maxResults)
-            .setRunningMode(RunningMode.LIVE_STREAM)
+            .setRunningMode(runningMode)
             .setBaseOptions(baseOptionsBuilder.build())
-            .setResultListener { result, image ->
+
+        if (runningMode == RunningMode.LIVE_STREAM) {
+            optionsBuilder.setResultListener { result, image ->
                 val finishTimeMs = SystemClock.uptimeMillis()
                 val inferenceTime = finishTimeMs - result.timestampMs()
                 imageClassifierListener?.onResults(result, inferenceTime)
             }
-            .setErrorListener { error ->
-                imageClassifierListener?.onError(error.message ?: "An unknown error has occurred")
+            optionsBuilder.setErrorListener { error ->
+                imageClassifierListener?.onError(
+                    error.message ?: "An unknown error has occurred"
+                )
             }
+        }
 
         val options = optionsBuilder.build()
         try {
@@ -71,7 +77,7 @@ class ImageClassifierHelper(
         }
     }
 
-    fun classify(image: ImageProxy) {
+    fun classifyLiveStreamFrame(image: ImageProxy) {
         if (imageClassifier == null) {
             setupImageClassifier()
         }
@@ -84,7 +90,7 @@ class ImageClassifierHelper(
         image.use { bitmapBuffer.copyPixelsFromBuffer(image.planes[0].buffer) }
         image.close()
 
-        val startTime = SystemClock.uptimeMillis()
+        val frameTime = SystemClock.uptimeMillis()
 
         val mpImage = BitmapImageBuilder(bitmapBuffer).build()
 
@@ -92,7 +98,31 @@ class ImageClassifierHelper(
             .setRotationDegrees(image.imageInfo.rotationDegrees)
             .build()
 
-        imageClassifier?.classifyAsync(mpImage, imageProcessingOptions, startTime)
+        imageClassifier?.classifyAsync(mpImage, imageProcessingOptions, frameTime)
+    }
+
+    fun classifyImage(bitmap: Bitmap) {
+        if (imageClassifier == null) {
+            setupImageClassifier()
+        }
+
+        val mpImage = BitmapImageBuilder(bitmap).build()
+
+        val imageProcessingOptions = ImageProcessingOptions.builder()
+            .build()
+
+        val startTime = SystemClock.uptimeMillis()
+
+        imageClassifier?.classify(mpImage, imageProcessingOptions).also { result ->
+            val inferenceTime = SystemClock.uptimeMillis() - startTime
+            imageClassifierListener?.onResults(result, inferenceTime)
+        }
+
+        if (imageClassifier == null) {
+            imageClassifierListener?.onError(
+                "Image classifier failed to classify."
+            )
+        }
     }
 
     interface ClassifierListener {
