@@ -16,8 +16,7 @@ import com.google.mediapipe.tasks.vision.imageclassifier.ImageClassifierResult
 class ImageClassifierHelper(
     var threshold: Float = 0.1f,
     var maxResults: Int = 3,
-    var numThreads: Int = 4,
-    var currentDelegate: Int = 2,
+    var currentDelegate: Delegate = Delegate.GPU,
     val modelName: String = "mobilenet_v1_1.0_224_quantized_1_metadata_1.tflite",
     var runningMode: RunningMode = RunningMode.IMAGE,
     val context: Context,
@@ -44,7 +43,7 @@ class ImageClassifierHelper(
     fun setupImageClassifier() {
 
         val baseOptionsBuilder = BaseOptions.builder()
-        baseOptionsBuilder.setDelegate(Delegate.CPU)
+        baseOptionsBuilder.setDelegate(currentDelegate)
         baseOptionsBuilder.setModelAssetPath(modelName)
 
         val optionsBuilder = ImageClassifier.ImageClassifierOptions.builder()
