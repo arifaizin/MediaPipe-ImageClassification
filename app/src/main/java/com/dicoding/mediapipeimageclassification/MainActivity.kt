@@ -118,7 +118,7 @@ class MainActivity : AppCompatActivity() {
                                     val displayResult =
                                         sortedCategories.joinToString("\n") {
                                             "${it.categoryName()} " + String.format(
-                                                "%.2f",
+                                                "%.2f%%",
                                                 it.score()
                                             ).trim()
                                         }
