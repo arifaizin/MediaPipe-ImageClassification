@@ -26,7 +26,7 @@ import java.util.concurrent.Executors
 
 class MainActivity : AppCompatActivity() {
 
-    private lateinit var imageClassifierHelper: ImageClassifierHelper
+    private lateinit var objectDetectorHelper: ObjectDetectorHelper
     private lateinit var binding: ActivityMainBinding
     private var imageCapture: ImageCapture? = null
 
@@ -95,36 +95,33 @@ class MainActivity : AppCompatActivity() {
 
     private fun startCamera() {
 
-        imageClassifierHelper =
-            ImageClassifierHelper(
+
+        objectDetectorHelper =
+            ObjectDetectorHelper(
                 context = this,
                 runningMode = RunningMode.LIVE_STREAM,
-                imageClassifierListener = object : ImageClassifierHelper.ClassifierListener {
-                    override fun onError(error: String) {
+                objectDetectorListener = object : ObjectDetectorHelper.DetectorListener {
+                    override fun onError(error: String, errorCode: Int) {
                         runOnUiThread {
                             Toast.makeText(this@MainActivity, error, Toast.LENGTH_SHORT).show()
                         }
                     }
 
-                    override fun onResults(results: ImageClassifierResult?, inferenceTime: Long) {
+                    override fun onResults(resultBundle: ObjectDetectorHelper.ResultBundle) {
                         runOnUiThread {
-                            results?.classificationResult()?.classifications()?.let { it ->
-                                println(it)
+                            val detectionResult = resultBundle.results[0]
 
-                                if (it.isNotEmpty() && it[0].categories().isNotEmpty()) {
-                                    println(it)
-                                    val sortedCategories =
-                                        it[0].categories().sortedByDescending { it?.score() }
-                                    val displayResult =
-                                        sortedCategories.joinToString("\n") {
-                                            "${it.categoryName()} " + String.format(
-                                                "%.2f%%",
-                                                it.score()
-                                            ).trim()
-                                        }
-                                    binding.tvResult.text = displayResult
-                                }
-                            }
+//                            if (isAdded) {
+                                binding.overlay.setResults(
+                                    detectionResult,
+                                    resultBundle.inputImageHeight,
+                                    resultBundle.inputImageWidth,
+                                    resultBundle.inputImageRotation
+                                )
+//                            }
+
+                            // Force a redraw
+                            binding.overlay.invalidate()
                         }
                     }
                 })
@@ -134,7 +131,7 @@ class MainActivity : AppCompatActivity() {
         cameraProviderFuture.addListener({
             val cameraProvider: ProcessCameraProvider = cameraProviderFuture.get()
             val preview = Preview.Builder()
-                .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+                .setTargetAspectRatio(AspectRatio.RATIO_16_9)
                 .build()
                 .also {
                     it.setSurfaceProvider(binding.viewFinder.surfaceProvider)
@@ -142,7 +139,7 @@ class MainActivity : AppCompatActivity() {
 
             val imageAnalyzer =
                 ImageAnalysis.Builder()
-                    .setTargetAspectRatio(AspectRatio.RATIO_4_3)
+                    .setTargetAspectRatio(AspectRatio.RATIO_16_9)
                     .setTargetRotation(binding.viewFinder.display.rotation)
                     .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                     .setOutputImageFormat(ImageAnalysis.OUTPUT_IMAGE_FORMAT_RGBA_8888)
@@ -151,7 +148,7 @@ class MainActivity : AppCompatActivity() {
                     .also {
                         it.setAnalyzer(Executors.newSingleThreadExecutor()) { image ->
                             // Pass Bitmap and rotation to the image classifier helper for processing and classification
-                            imageClassifierHelper.classifyLiveStreamFrame(image)
+                            objectDetectorHelper.detectLivestreamFrame(image)
                         }
                     }
 
@@ -172,17 +169,17 @@ class MainActivity : AppCompatActivity() {
         }, ContextCompat.getMainExecutor(this))
     }
 
-    override fun onPause() {
-        super.onPause()
-        imageClassifierHelper.clearImageClassifier()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        if (imageClassifierHelper.isClosed()) {
-            imageClassifierHelper.setupImageClassifier()
-        }
-    }
+//    override fun onPause() {
+//        super.onPause()
+//        imageClassifierHelper.clearImageClassifier()
+//    }
+//
+//    override fun onResume() {
+//        super.onResume()
+//        if (imageClassifierHelper.isClosed()) {
+//            imageClassifierHelper.setupImageClassifier()
+//        }
+//    }
 
     companion object{
         private const val FILENAME_FORMAT = "yyyy-MM-dd-HH-mm-ss-SSS"
